@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block title %}Customer Management{% endblock %}
+
+{% block content %}
+    <style>
+        .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: end; }
+        .grid-form div { margin-bottom: 5px;} /* Add space below each form element container */
+        .grid-form button { padding: 10px 15px; /* Slightly larger buttons */ }
+        /* Style for informed list status */
+        .status-sent { color: green; font-weight: bold; }
+        .status-failed { color: red; font-weight: bold; }
+        .status-error { color: darkred; font-weight: bold; }
+        .status-skipped { color: orange; font-weight: bold; }
+    </style>
+
+    <h2>Add / Edit Customer</h2>
+    <div class="card">
+        <form id="customer-form" class="grid-form">
+            <input type="hidden" id="customer-id">
+            <div>
+                <label for="name">Customer Name *</label>
+                <input type="text" id="name" required>
+            </div>
+            <div>
+                <label for="visa_type">Visa Type *</label>
+                <input type="text" id="visa_type" required>
+            </div>
+            <div>
+                <label for="expiry_date">Expiry Date *</label>
+                <input type="date" id="expiry_date" required>
+            </div>
+            <div>
+                <label for="country_code">Country Code</label>
+                <input type="text" id="country_code" placeholder="e.g., 971">
+            </div>
+            <div>
+                <label for="phone">Phone Number</label>
+                <input type="text" id="phone" placeholder="e.g., 501234567">
+            </div>
+            <div>
+                <button type="submit" id="submit-btn" class="send">Add Customer</button>
+                <button type="button" onclick="clearForm()">Clear</button>
+            </div>
+        </form>
+    </div>
+
+    <hr>
+
+    <h2>Existing Customers</h2>
+    <button onclick="loadCustomers()">🔄 Refresh List</button>
+    <table id="customer-table">
+        <thead>
+            <tr><th>ID</th><th>Name</th><th>Visa Type</th><th>Expiry Date</th><th>Phone</th><th>Actions</th></tr>
+        </thead>
+        <tbody> </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Informed List (Sent Notifications)</h2>
+    <div>
+        Filter:
+        <button onclick="loadInformedList('all')">All Time</button>
+        <button onclick="loadInformedList('today')">Today</button>
+    </div>
+    <table id="informed-table">
+        <thead>
+            <tr><th>Sent At</th><th>Name</th><th>Phone</th><th>Msg Snippet</th><th>Status</th></tr>
+        </thead>
+        <tbody> </tbody>
+    </table>
+
+    <details>
+        <summary>📊 Import from Excel</summary>
+        <div id="import" class="card">
+            <p>Upload .xlsx/.xls: <strong>Customer Name, Visa Type, Visa expiry date, CC, phone</strong></p>
+            <form id="import-form">
+                <input type="file" id="excel-file" name="excel-file" accept=".xls,.xlsx" required>
+                <button type="submit">1. Preview Data</button>
+            </form>
+            <div id="preview-area" style="display:none; margin-top: 15px;">
+                <h3>Preview</h3>
+                <div id="import-errors" style="color: red; margin-bottom: 10px; max-height: 150px; overflow-y: auto; border: 1px solid #fcc; padding: 5px; background: #fff5f5;"></div>
+                <button id="commit-import-btn" class="send">2. Commit Import</button>
+                <table id="preview-table" style="margin-top: 10px;">
+                    <thead><tr><th>Name</th><th>Visa Type</th><th>Expiry Date</th><th>Phone</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+     </details>
+
+    <script>
+        let previewData = []; // Store excel data for commit
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCustomers();
+            loadInformedList('all');
+            document.getElementById('customer-form').addEventListener('submit', handleFormSubmit);
+            document.getElementById('import-form').addEventListener('submit', handleExcelPreview);
+            document.getElementById('commit-import-btn').addEventListener('click', handleExcelCommit);
+        });
+
+        async function loadCustomers() {
+            // ... (JavaScript remains largely the same as previous 'customers.html')
+            try {
+                const response = await fetch('/api/customers');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const customers = await response.json();
+                const tbody = document.querySelector('#customer-table tbody');
+                tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>'; // Loading indicator
+                if (!customers || customers.length === 0) {
+                     tbody.innerHTML = '<tr><td colspan="6">No customers found. Add one above or import from Excel.</td></tr>';
+                     return;
+                }
+                tbody.innerHTML = ''; // Clear loading/previous
+                customers.forEach(cust => {
+                    const phone = (cust.country_code || '') + (cust.phone_number || '');
+                    // Safely stringify customer data for the edit button
+                    const custJson = JSON.stringify(cust).replace(/"/g, '&quot;');
+                    tbody.innerHTML += `
+                        <tr data-id="${cust.id}">
+                            <td>${cust.id}</td>
+                            <td>${cust.customer_name || ''}</td>
+                            <td>${cust.visa_type || ''}</td>
+                            <td>${cust.visa_expiry_date || ''}</td>
+                            <td>${phone || 'N/A'}</td>
+                            <td>
+                                <button onclick='editCustomer(${custJson})'>Edit</button>
+                                <button class="delete" onclick="deleteCustomer(${cust.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) { console.error('Error loading customers:', error); alert('Error loading customer list.'); tbody.innerHTML = `<tr><td colspan="6" style="color:red;">Error loading data.</td></tr>`;}
+        }
+
+        function clearForm() {
+            // ... (JavaScript remains the same as previous 'customers.html')
+            document.getElementById('customer-form').reset(); document.getElementById('customer-id').value = ''; document.getElementById('submit-btn').innerText = 'Add Customer';
+        }
+
+        function editCustomer(customerData) {
+            // ... (JavaScript remains the same as previous 'customers.html')
+            document.getElementById('customer-id').value = customerData.id; document.getElementById('name').value = customerData.customer_name; document.getElementById('visa_type').value = customerData.visa_type; document.getElementById('expiry_date').value = customerData.visa_expiry_date; document.getElementById('country_code').value = customerData.country_code || ''; document.getElementById('phone').value = customerData.phone_number || ''; document.getElementById('submit-btn').innerText = 'Update Customer'; window.scrollTo(0, 0);
+        }
+
+        async function handleFormSubmit(e) {
+            // ... (JavaScript remains the same as previous 'customers.html', including the alert about PUT needing implementation)
+             e.preventDefault(); const customerId = document.getElementById('customer-id').value;
+             const data = { name: document.getElementById('name').value.trim(), visa_type: document.getElementById('visa_type').value.trim(), expiry_date: document.getElementById('expiry_date').value, country_code: document.getElementById('country_code').value.trim() || null, phone: document.getElementById('phone').value.trim() || null };
+             if (!data.name || !data.visa_type || !data.expiry_date) { alert('Please fill Name, Visa Type, Expiry Date.'); return; }
+             if (!/^\d{4}-\d{2}-\d{2}$/.test(data.expiry_date)) { alert('Use YYYY-MM-DD format for Expiry Date.'); return; }
+             const url = customerId ? `/api/customers/${customerId}` : '/api/customers'; const method = 'POST'; // Only POST implemented
+             if (customerId) { alert('Update needs PUT route in app.py. Using Add.'); }
+             try {
+                const response = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                const result = await response.json();
+                if (response.ok) { alert(customerId ? 'Update simulated!' : 'Customer added!'); clearForm(); loadCustomers(); }
+                else { alert(`Error: ${result.error || 'Unknown error'} (Status: ${response.status})`); }
+             } catch (error) { console.error('Form submit error:', error); alert('Network/server error submitting.'); }
+        }
+
+        async function deleteCustomer(id) {
+            // ... (JavaScript remains the same as previous 'customers.html')
+            if (!confirm(`Delete customer ID ${id}?`)) return; try { const response = await fetch(`/api/customers/${id}`, { method: 'DELETE' }); const result = await response.json(); if (response.ok) { alert('Customer deleted'); loadCustomers(); loadInformedList('all'); } else { alert(`Error: ${result.error || 'Failed to delete.'}`); } } catch (error) { console.error('Delete error:', error); alert('Network/server error deleting.'); }
+        }
+
+        async function loadInformedList(filter) {
+            // ... (JavaScript remains largely the same as previous 'customers.html')
+            const tbody = document.querySelector('#informed-table tbody');
+            tbody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
+             try {
+                const response = await fetch(`/api/informed-customers?filter=${filter}`);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const logs = await response.json();
+                if (!logs || logs.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No notifications found for this filter.</td></tr>'; return; }
+                tbody.innerHTML = ''; // Clear loading
+                logs.forEach(log => {
+                     // Determine status class
+                    let statusClass = '';
+                    if (log.status === 'sent') statusClass = 'status-sent';
+                    else if (log.status === 'skipped') statusClass = 'status-skipped';
+                    else if (log.status && log.status.startsWith('failed')) statusClass = 'status-failed';
+                    else if (log.status && log.status.startsWith('error')) statusClass = 'status-error';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${log.sent_at || 'N/A'}</td>
+                            <td>${log.customer_name || 'N/A'}</td>
+                            <td>${log.phone || 'N/A'}</td>
+                            <td>${(log.message || '').substring(0, 50)}...</td>
+                            <td class="${statusClass}">${log.status || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+            } catch (error) { console.error('Error loading informed list:', error); alert('Error loading informed list.'); tbody.innerHTML = `<tr><td colspan="5" style="color:red;">Error loading data.</td></tr>`; }
+        }
+
+        async function handleExcelPreview(e) {
+            // ... (JavaScript remains the same as previous 'customers.html')
+             e.preventDefault(); const fileInput = document.getElementById('excel-file'); if (!fileInput.files || fileInput.files.length === 0) { alert("Select Excel file."); return; } const formData = new FormData(); formData.append('excel-file', fileInput.files[0]); document.getElementById('commit-import-btn').innerText = 'Processing...'; document.getElementById('commit-import-btn').disabled = true;
+             try {
+                const response = await fetch('/api/import-excel', { method: 'POST', body: formData }); const result = await response.json(); const previewArea = document.getElementById('preview-area'); const errorDiv = document.getElementById('import-errors'); const previewTbody = document.querySelector('#preview-table tbody'); errorDiv.innerHTML = ''; previewTbody.innerHTML = ''; previewData = [];
+                if (result.errors && result.errors.length > 0) { errorDiv.innerHTML = `<strong>Errors (will be skipped):</strong><br>${result.errors.join('<br>')}`; } else { errorDiv.innerHTML = ''; }
+                if (result.data_to_preview && result.data_to_preview.length > 0) { previewData = result.data_to_preview; previewData.forEach(row => { const phone = (row.country_code || '') + (row.phone_number || ''); previewTbody.innerHTML += `<tr><td>${row.customer_name}</td><td>${row.visa_type}</td><td>${row.expiry_date}</td><td>${phone || 'N/A'}</td></tr>`; }); previewArea.style.display = 'block'; document.getElementById('commit-import-btn').innerText = `2. Commit Import (${previewData.length} Records)`; document.getElementById('commit-import-btn').disabled = false; }
+                else { previewArea.style.display = 'none'; if (!result.errors || result.errors.length === 0) { errorDiv.innerHTML = 'No new valid data found.'; } }
+             } catch (error) { console.error("Excel Preview Error:", error); document.getElementById('import-errors').innerHTML = 'Server error during preview.'; previewArea.style.display = 'block'; document.getElementById('preview-table tbody').innerHTML = ''; }
+             finally { if (previewData.length === 0) { document.getElementById('commit-import-btn').innerText = '2. Commit Import'; document.getElementById('commit-import-btn').disabled = true; } fileInput.value = ''; }
+        }
+
+        async function handleExcelCommit() {
+            // ... (JavaScript remains the same as previous 'customers.html')
+             if (previewData.length === 0) { alert('No valid data to import.'); return; } if (!confirm(`Import ${previewData.length} records? Duplicates will be skipped.`)) return; document.getElementById('commit-import-btn').innerText = 'Importing...'; document.getElementById('commit-import-btn').disabled = true;
+             try {
+                const response = await fetch('/api/commit-import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: previewData }) }); const result = await response.json();
+                if (result.success) { alert(`Import complete!\nImported: ${result.imported}\nSkipped: ${result.skipped || 0}`); document.getElementById('preview-area').style.display = 'none'; document.getElementById('import-form').reset(); loadCustomers(); previewData = []; }
+                else { alert('Error committing import: ' + (result.error || 'Unknown')); }
+             } catch (error) { console.error("Excel Commit Error:", error); alert('Network/server error during commit.'); }
+             finally { document.getElementById('commit-import-btn').innerText = '2. Commit Import'; document.getElementById('commit-import-btn').disabled = previewData.length === 0; }
+        }
+
+    </script>
+{% endblock %}
