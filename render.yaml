@@ -3,21 +3,19 @@ services:
   - type: web
     name: crm-app
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python3 init_db.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
-      - key: PORT
-        value: 8080
       - key: WAHA_URL
-        sync: false  # Set to your WAHA service URL after deployment
+        sync: false  # Set to your WAHA service URL (https://waha-xxxx.onrender.com)
       - key: WAHA_API_KEY
-        sync: false  # Set this in Render dashboard
+        sync: false  # Set this in Render dashboard after WAHA deploys
       - key: WAHA_SESSION
         value: default
       - key: FLASK_DEBUG
         value: False
       - key: DB_PATH
-        value: /opt/render/project/src/crm.db
+        value: ./crm.db
 
   # WAHA WhatsApp API Service
   - type: web
@@ -40,11 +38,11 @@ services:
     startCommand: python3 send_notifications.py
     envVars:
       - key: WAHA_URL
-        sync: false  # Set to your WAHA service URL after deployment
+        sync: false  # Set to your WAHA service URL (https://waha-xxxx.onrender.com)
       - key: WAHA_API_KEY
-        sync: false  # Set this in Render dashboard
+        sync: false  # Set this in Render dashboard after WAHA deploys
       - key: WAHA_SESSION
         value: default
       - key: DB_PATH
-        value: /opt/render/project/src/crm.db
+        value: ./crm.db
 
