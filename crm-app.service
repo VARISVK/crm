@@ -1,0 +1,35 @@
+[Unit]
+Description=CRM Flask Application (Gunicorn)
+After=network.target postgresql.service
+Requires=network.target
+
+[Service]
+Type=notify
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/crm-app
+Environment="PATH=/home/ubuntu/crm-app/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/ubuntu/crm-app/.env
+
+# Gunicorn configuration
+ExecStart=/home/ubuntu/crm-app/venv/bin/gunicorn \
+    --workers 4 \
+    --worker-class sync \
+    --timeout 120 \
+    --bind 0.0.0.0:8080 \
+    --access-logfile /var/log/crm-app-access.log \
+    --error-logfile /var/log/crm-app-error.log \
+    --log-level info \
+    app:app
+
+# Restart configuration
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

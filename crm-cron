@@ -1,0 +1,16 @@
+# CRM Automated Notifications Cron Job
+# Runs daily at 3:00 UTC (7:00 AM UAE time)
+# Edit this file with: sudo crontab -e
+
+# Set environment variables
+DB_HOST=your_db_host
+DB_NAME=crm_db
+DB_USER=postgres
+DB_PASS=your_db_password
+WAHA_URL=http://localhost:3000
+WAHA_API_KEY=your_waha_api_key
+WAHA_SESSION=default
+
+# Run notification script
+0 3 * * * cd /home/ubuntu/crm-app && /home/ubuntu/crm-app/venv/bin/python3 send_notifications.py >> /var/log/crm-cron.log 2>&1
+
