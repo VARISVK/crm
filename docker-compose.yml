@@ -10,5 +10,5 @@ services:
       - WHATSAPP_API_PORT=3000
     volumes:
       - ./waha-data:/app/.sessions
-    restart: unless-started
+    restart: unless-stopped
 
