@@ -9,7 +9,7 @@ services:
       - key: PORT
         value: 8080
       - key: WAHA_URL
-        value: http://waha:3000
+        sync: false  # Set to your WAHA service URL after deployment
       - key: WAHA_API_KEY
         sync: false  # Set this in Render dashboard
       - key: WAHA_SESSION
