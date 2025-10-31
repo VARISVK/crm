@@ -34,6 +34,7 @@ services:
   - type: cron
     name: send-notifications
     schedule: "0 3 * * *"  # Cron format: minute hour day month weekday
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python3 send_notifications.py
     envVars:
