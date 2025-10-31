@@ -69,6 +69,37 @@ def index():
     """Serves the main page."""
     return render_template('index.html')
 
+@app.route('/api/trigger-notifications', methods=['POST', 'GET'])
+def trigger_notifications():
+    """API endpoint to trigger notifications manually or via external cron service."""
+    import subprocess
+    import os
+    try:
+        # Run the notification script
+        result = subprocess.run(
+            ['python3', 'send_notifications.py'],
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout
+            env=os.environ.copy()
+        )
+        return jsonify({
+            'success': result.returncode == 0,
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None,
+            'returncode': result.returncode
+        }), 200 if result.returncode == 0 else 500
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Notification script timed out (over 5 minutes)'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # ===================================================================
 # API Routes
 # ===================================================================
