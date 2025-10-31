@@ -1,0 +1,50 @@
+services:
+  # Main Flask Web Application
+  - type: web
+    name: crm-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: WAHA_URL
+        value: http://waha:3000
+      - key: WAHA_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: WAHA_SESSION
+        value: default
+      - key: FLASK_DEBUG
+        value: False
+      - key: DB_PATH
+        value: /opt/render/project/src/crm.db
+
+  # WAHA WhatsApp API Service
+  - type: web
+    name: waha
+    env: docker
+    dockerfilePath: ./Dockerfile.waha
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: WHATSAPP_API_HOSTNAME
+        value: 0.0.0.0
+      - key: WHATSAPP_API_PORT
+        value: 3000
+
+  # Scheduled Job for Notifications (runs daily at 3 AM UTC = 7 AM UAE)
+  - type: cron
+    name: send-notifications
+    schedule: "0 3 * * *"  # Cron format: minute hour day month weekday
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 send_notifications.py
+    envVars:
+      - key: WAHA_URL
+        sync: false  # Set to your WAHA service URL after deployment
+      - key: WAHA_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: WAHA_SESSION
+        value: default
+      - key: DB_PATH
+        value: /opt/render/project/src/crm.db
+
